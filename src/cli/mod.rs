@@ -34,6 +34,17 @@ pub fn run() -> Command {
         )
         .subcommand(
             Command::new("play")
+                .about("Play a sound for a given command")
                 .arg(arg!(<COMMAND> "The command to play the sound for"))
+        )
+        .subcommand(
+            Command::new("config")
+                .about("Config related commands")
+                .arg_required_else_help(true)
+                .subcommand(
+                    Command::new("print")
+                        .about("Print the current configuration")
+                        .arg_required_else_help(false)
+                )
         )
 }

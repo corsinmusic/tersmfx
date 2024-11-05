@@ -1,4 +1,10 @@
 mod cli;
+mod daemon;
+mod audio;
+mod config;
+mod client;
+
+use daemon::Daemon;
 
 fn main() {
    let matches = cli::run().get_matches();
@@ -7,23 +13,31 @@ fn main() {
        Some(("daemon", daemon_matches)) => {
            match daemon_matches.subcommand() {
                Some(("start", _)) => {
-                   println!("Starting daemon");
+                   Daemon::start();
                }
                Some(("stop", _)) => {
-                   println!("Stopping daemon");
+                   Daemon::stop();
                }
                Some(("restart", _)) => {
-                   println!("Restarting daemon");
+                   Daemon::restart();
                }
                Some(("status", _)) => {
-                   println!("Getting daemon status");
+                   Daemon::status();
                }
                _ => unreachable!(),
            }
        },
        Some(("play", play_matches)) => {
            let command = play_matches.get_one::<String>("COMMAND").expect("required");
-           println!("Playing sound for command: {}", command);
+           client::play(&command);
+       },
+       Some(("config", config_matches)) => {
+           match config_matches.subcommand() {
+               Some(("print", _)) => {
+                   client::print_config();
+               }
+               _ => unreachable!(),
+           }
        },
        _ => unreachable!(),
    }
