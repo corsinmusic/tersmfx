@@ -1,7 +1,12 @@
-use serde::Deserialize;
 use std::fmt::Debug;
+use std::path::{Path, PathBuf};
 
-#[derive(Debug, Deserialize, Clone)]
+use regex::Regex;
+
+use super::termsfx_config_source::{TermsfxCommandConfigSource, TermsfxConfigSource, TermsfxConfigSourceError};
+
+
+#[derive(Debug, Clone)]
 pub struct TermsfxConfig {
     pub commands: Vec<TermsfxCommandConfig>,
 }
@@ -13,45 +18,62 @@ impl TermsfxConfig {
         }
     }
 
-    pub fn validate(&self) -> Result<(), String> {
-        for command in &self.commands {
-            command.validate()?;
-        }
+    pub fn try_from_source<P: AsRef<Path>>(source: TermsfxConfigSource, base_path: P,) -> Result<Self, TermsfxConfigSourceError> {
+        let _ = source.validate();
 
-        Ok(())
+        let commands = source.commands.into_iter().map(|command| {
+            TermsfxCommandConfig::try_from_source(command, base_path.as_ref())
+        }).collect::<Result<Vec<_>, TermsfxConfigSourceError>>();
+
+        Ok(TermsfxConfig {
+            commands: commands?,
+        })
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct TermsfxCommandConfig {
-    pub command: String,
-    pub audio_file_path: Option<String>,
-    pub audio_file_paths: Option<Vec<String>>,
+    pub command: Regex,
+    pub audio_file_path: Option<PathBuf>,
+    pub audio_file_paths: Option<Vec<PathBuf>>,
 }
 
 impl TermsfxCommandConfig {
-    pub fn new(command: String, audio_file_path: Option<String>, audio_file_paths: Option<Vec<String>>) -> Self {
-        Self {
+    pub fn try_from_source<P: AsRef<Path>>(
+        source: TermsfxCommandConfigSource,
+        base_path: P,
+    ) -> Result<Self, TermsfxConfigSourceError> {
+        let command = Regex::new(&source.command)?;
+
+        let base_path = base_path.as_ref();
+
+        let audio_file_path = source.audio_file_path.map(|path_str| {
+            let path = PathBuf::from(path_str);
+            if path.is_relative() {
+                base_path.join(path)
+            } else {
+                path
+            }
+        });
+
+        let audio_file_paths = source.audio_file_paths.map(|paths| {
+            paths
+                .into_iter()
+                .map(|path_str| {
+                    let path = PathBuf::from(path_str);
+                    if path.is_relative() {
+                        Ok(base_path.join(path))
+                    } else {
+                        Ok(path)
+                    }
+                })
+                .collect::<Result<Vec<_>, TermsfxConfigSourceError>>()
+        }).transpose()?;
+
+        Ok(TermsfxCommandConfig {
             command,
             audio_file_path,
-            audio_file_paths
-        }
-    }
-
-    fn validate(&self) -> Result<(), String> {
-        if self.command.is_empty() {
-            return Err("Command cannot be empty".to_string());
-        }
-
-        if self.audio_file_path.is_none() && self.audio_file_paths.is_none() {
-            return Err("Either audioFilePath or audioFilePaths must be provided".to_string());
-        }
-
-        if self.audio_file_path.is_some() && self.audio_file_paths.is_some() {
-            return Err("Only one of audioFilePath or audioFilePaths must be provided".to_string());
-        }
-
-        Ok(())
+            audio_file_paths,
+        })
     }
 }

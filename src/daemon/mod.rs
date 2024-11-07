@@ -11,7 +11,8 @@ use std::sync::Arc;
 
 use crate::audio;
 use crate::config::termsfx_config::TermsfxConfig;
-use crate::config::TermsfxConfigLoader;
+use crate::config::termsfx_config_loader::TermsfxConfigLoader;
+
 use daemon_action::DaemonAction;
 
 const DAEMON_STDOUT_FILE_PATH: &str = "/tmp/termsfx_daemon.out";
@@ -175,14 +176,14 @@ async fn process_event(action: DaemonAction, config: TermsfxConfig, stream_handl
     match action {
         DaemonAction::Play(command) => {
             for cmd in &config.commands {
-                if cmd.command == command {
+                if cmd.command.is_match(&command) {
                     println!("Playing sound for '{}'", command);
 
                     if let Some(audio_file_path) = &cmd.audio_file_path {
-                        audio::play_audio(&stream_handle, audio_file_path);
+                        audio::play_audio(&stream_handle, audio_file_path.to_str().unwrap());
                     } else if let Some(audio_file_paths) = &cmd.audio_file_paths {
                         for audio_file_path in audio_file_paths {
-                            audio::play_audio(&stream_handle, audio_file_path);
+                            audio::play_audio(&stream_handle, audio_file_path.to_str().unwrap());
                         }
                     }
                 }
